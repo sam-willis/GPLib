@@ -3,28 +3,28 @@ using LinearAlgebra
 using Plots
 using TypedDelegation
 import Base
+import Zygote
 
 abstract type Kernel end
 abstract type HyperParameters end
 abstract type GPModel end
 
-mutable struct HyperParameter{T <: Number} 
-    value:: T
+mutable struct HyperParameter
+    value # how do I put a type here?
 end
-Base.:+(x::HyperParameter, y::Number) = Base.:+(promote(x.value, y)...)
-Base.:+(x::Number, y::HyperParameter) = Base.:+(promote(x, y.value)...)
-Base.:-(x::HyperParameter, y::Number) = Base.:-(promote(x.value, y)...)
-Base.:-(x::Number, y::HyperParameter) = Base.:-(promote(x, y.value)...)
-Base.:*(x::HyperParameter, y::Number) = Base.:*(promote(x.value, y)...)
-Base.:*(x::Number, y::HyperParameter) = Base.:*(promote(x, y.value)...)
-Base.:/(x::HyperParameter, y::Number) = Base.:/(promote(x.value, y)...)
-Base.:/(x::Number, y::HyperParameter) = Base.:/(promote(x, y.value)...)
-Base.:^(x::HyperParameter, y::Number) = Base.:^(promote(x.value, y)...)
-Base.:^(x::Number, y::HyperParameter) = Base.:^(promote(x, y.value)...)
-Base.convert(::Type{T}, param:: HyperParameter{T}) where T = param.value
-Base.convert(::Type{HyperParameter}, value) = HyperParameter(value)
+Base.:+(x::HyperParameter, y::Number) = Base.:+(promote(x.value[1][1], y)...)
+Base.:+(x::Number, y::HyperParameter) = Base.:+(promote(x, y.value[1][1])...)
+Base.:-(x::HyperParameter, y::Number) = Base.:-(promote(x.value[1][1], y)...)
+Base.:-(x::Number, y::HyperParameter) = Base.:-(promote(x, y.value[1][1])...)
+Base.:*(x::HyperParameter, y::Number) = Base.:*(promote(x.value[1][1], y)...)
+Base.:*(x::Number, y::HyperParameter) = Base.:*(promote(x, y.value[1][1])...)
+Base.:/(x::HyperParameter, y::Number) = Base.:/(promote(x.value[1][1], y)...)
+Base.:/(x::Number, y::HyperParameter) = Base.:/(promote(x, y.value[1][1])...)
+Base.:^(x::HyperParameter, y::Number) = Base.:^(promote(x.value[1][1], y)...)
+Base.:^(x::Number, y::HyperParameter) = Base.:^(promote(x, y.value[1][1])...)
+#Base.convert(::Type{T}, param:: HyperParameter{T}) where T = param.value[1][1]
+Base.convert(::Type{HyperParameter}, value) = HyperParameter(params([value]))
 
-#%% Data structuresQ
 struct RBFKernel <: Kernel
     l:: HyperParameter
 end
@@ -35,8 +35,6 @@ struct GPR <: GPModel
     kernel:: Kernel
     σ:: HyperParameter
 end
-
-#%% Helper functions
 
 function predict_mean(model:: GPR, x, y, x_new)
     K = model.kernel
@@ -71,7 +69,7 @@ function grad_step!(g, θ, alpha)
 end
 
 function optimise!(gpr:: GPR, x, y, n_steps=1000, alpha=0.001)
-    g(θ) = gradient(θ -> loglik(gpr, x, y), θ)
+    g(θ) = gradient(() -> loglik(gpr, x, y), θ.value)
     for _=1:n_steps
         grad_step!(g, gpr.σ, alpha)
     end
