@@ -7,10 +7,16 @@ import Base
 abstract type Kernel end
 abstract type GPModel end
 
-# TODO: should this be mutable?
-struct HyperParameter{T <: AbstractFloat}
+mutable struct HyperParameter{T <: AbstractFloat}
     value:: Vector{T}
+    function HyperParameter(value:: Vector{S}) where S <: AbstractFloat
+        size(value) == (1,) || throw(AssertionError("Size must be 1"))
+        new{S}(value)
+    end
 end
+HyperParameter(value:: Number) = HyperParameter([float(value)])
+Base.convert(::Type{HyperParameter}, value :: Number) = HyperParameter([float(value)])
+Flux.@functor HyperParameter
 # TODO: replace this with a macro or something metaprogrammy
 Base.:+(x::HyperParameter, y::Number) = Base.:+(promote(x.value[1][1], y)...)
 Base.:+(x::Number, y::HyperParameter) = Base.:+(promote(x, y.value[1][1])...)
@@ -22,8 +28,6 @@ Base.:/(x::HyperParameter, y::Number) = Base.:/(promote(x.value[1][1], y)...)
 Base.:/(x::Number, y::HyperParameter) = Base.:/(promote(x, y.value[1][1])...)
 Base.:^(x::HyperParameter, y::Number) = Base.:^(promote(x.value[1][1], y)...)
 Base.:^(x::Number, y::HyperParameter) = Base.:^(promote(x, y.value[1][1])...)
-Base.convert(::Type{HyperParameter}, value :: Number) = HyperParameter([float(value)])
-Flux.@functor HyperParameter
 Base.show(io::IO, x::HyperParameter) = show(io, x.value[1][1])
 
 struct RBFKernel <: Kernel
@@ -32,11 +36,18 @@ end
 (k:: RBFKernel)(x, y) = exp.(-abs.(x .- y').^2 ./ (2*k.l^2))
 Flux.@functor RBFKernel
 
-struct GPR <: GPModel
-    # TODO: allow uninitialised data at creation
+mutable struct GPR <: GPModel
+    # make this immutable, but where the training data is a mutable object
     training_data:: Tuple{AbstractVecOrMat, AbstractVector}
     kernel:: Kernel
     σ:: HyperParameter
+    GPR(training_data, kernel, σ) = new(training_data, kernel, σ)
+    function GPR(kernel, σ)
+        gpr = new()
+        gpr.kernel = kernel
+        gpr.σ = σ
+        gpr
+    end
 end
 Flux.trainable(m::GPR) = (m.kernel, m.σ)
 Flux.@functor GPR
@@ -67,10 +78,9 @@ function loglik(model:: GPR)
     -0.5*y'*inv(K(x, x) + I*σ^2)*y - 0.5*log(det(K(x, x) + I*σ^2)) - 0.5*n*log(2*pi)
 end
 
-# TODO: this isn't working yet
 function grad_step!(model:: GPR, η=1e-3:: AbstractFloat)
     θ = params(model)
-    ∇ = gradient(() -> loglik(model), θ)
+    ∇ = gradient(() -> -loglik(model), θ)
     for p in θ
         update!(p, η * ∇[p])
     end
@@ -81,12 +91,12 @@ x = collect(1:10);
 y = x/10 + 0.5 * rand(size(x, 1))
 x_test = collect(1:0.01:20)
 
-gpr = GPR((x, y), RBFKernel(1), 0.1)
+gpr = GPR(RBFKernel(1.5), 0.1)
+gpr.training_data = (x, y)
 
 #%% basic optimisation
-
 println(params(gpr))
-for _=1:1000
+for _=1:10000
     grad_step!(gpr)
 end
 println(params(gpr))
