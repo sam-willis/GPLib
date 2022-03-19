@@ -37,31 +37,42 @@ end
 (k:: RBFKernel)(x, y) = exp.(-abs.(x .- y').^2 ./ (2*k.l^2))
 Flux.@functor RBFKernel
 
-mutable struct GPR <: GPModel
-    # make this immutable, but where the training data is a mutable object
-    training_data:: Tuple{AbstractVecOrMat, AbstractVector}
-    kernel:: Kernel
-    σ:: HyperParameter
-    GPR(training_data, kernel, σ) = new(training_data, kernel, σ)
-    function GPR(kernel, σ)
-        gpr = new()
-        gpr.kernel = kernel
-        gpr.σ = σ
-        gpr
+mutable struct Data
+    x:: AbstractVecOrMat
+    y:: AbstractVector
+    Data(x, y) = new(x, y)
+    Data() = new()
+end
+Base.convert(::Type{Data}, value :: Tuple{AbstractVecOrMat, AbstractVector}) = Data(value[1], value[2])
+Base.getproperty(d::Data, f::Symbol) = f === :xy ? (d.x, d.y) : getfield(d, f)
+function Base.setproperty!(d::Data, f::Symbol, value :: Tuple{AbstractVecOrMat, AbstractVector})
+    if f === :xy 
+        setfield!(d, :x, value[1])
+        setfield!(d, :y, value[2])
+    else
+        setfield!(d, f, value)
     end
 end
+Data((x, y)) = Data(x, y)
+
+struct GPR <: GPModel
+    training_data:: Data
+    kernel:: Kernel
+    σ:: HyperParameter
+end
+GPR(kernel, σ) = GPR(Data(), kernel, σ)
 Flux.trainable(m::GPR) = (m.kernel, m.σ)
 Flux.@functor GPR
 
 function predict_mean(model:: GPR, x_new:: AbstractVecOrMat)
-    (x, y) = model.training_data
+    (x, y) = model.training_data.xy
     K = model.kernel
     σ = model.σ
     K(x_new, x) * inv(K(x, x) + I*σ^2) * y
 end
 
 function predict_cov(model:: GPR, x_new:: AbstractVecOrMat)
-    (x, _) = model.training_data
+    (x, _) = model.training_data.xy
     K = model.kernel
     σ = model.σ
     K(x_new, x_new) - K(x_new, x) * inv(K(x, x) + I*σ^2) * K(x_new, x)'
@@ -72,7 +83,7 @@ function predict_std(model:: GPModel, x_new:: AbstractVecOrMat)
 end
 
 function loglik(model:: GPR)
-    (x, y) = model.training_data
+    (x, y) = model.training_data.xy
     K = model.kernel
     σ = model.σ
     n = length(x)
@@ -106,11 +117,7 @@ function plot(x:: AbstractVecOrMat, model:: GPR)
         c=1, 
         label="var"
     )
-end
-
-function plot(x:: AbstractVecOrMat, model:: GPR, training_data:: Tuple{AbstractVecOrMat, AbstractVector})
-    plot(x, model)
-    (x_train, y_train) = training_data
+    (x_train, y_train) = gpr.training_data.xy
     plot!(
         x_train, 
         y_train, 
@@ -125,7 +132,7 @@ y = x/10 + 0.5 * rand(size(x, 1))
 x_test = collect(1:0.01:20)
 
 gpr = GPR(RBFKernel(1.5), 0.1)
-gpr.training_data = (x, y)
+gpr.training_data.xy = (x, y)
 
 #%% basic optimisation
 println(params(gpr))
@@ -136,4 +143,4 @@ println(params(gpr))
 
 #%% plot prediction vs training data
 
-plot(x_test, gpr, (x, y))
+plot(x_test, gpr)
