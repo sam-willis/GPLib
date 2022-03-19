@@ -1,18 +1,17 @@
-using Flux
 using LinearAlgebra
 using Plots
-using TypedDelegation
-import Base
-import Zygote
+using Flux
 using Flux.Optimise: update!
-using Base: AbstractVecOrMat, AbstractVector
+import Base
 
 abstract type Kernel end
 abstract type GPModel end
 
+# TODO: should this be mutable?
 struct HyperParameter{T <: AbstractFloat}
     value:: Vector{T}
 end
+# TODO: replace this with a macro or something metaprogrammy
 Base.:+(x::HyperParameter, y::Number) = Base.:+(promote(x.value[1][1], y)...)
 Base.:+(x::Number, y::HyperParameter) = Base.:+(promote(x, y.value[1][1])...)
 Base.:-(x::HyperParameter, y::Number) = Base.:-(promote(x.value[1][1], y)...)
@@ -34,6 +33,7 @@ end
 Flux.@functor RBFKernel
 
 struct GPR <: GPModel
+    # TODO: allow uninitialised data at creation
     training_data:: Tuple{AbstractVecOrMat, AbstractVector}
     kernel:: Kernel
     σ:: HyperParameter
@@ -41,21 +41,21 @@ end
 Flux.trainable(m::GPR) = (m.kernel, m.σ)
 Flux.@functor GPR
 
-function predict_mean(model:: GPR, x_new)
+function predict_mean(model:: GPR, x_new:: AbstractVecOrMat)
     (x, y) = model.training_data
     K = model.kernel
     σ = model.σ
     K(x_new, x) * inv(K(x, x) + I*σ^2) * y
 end
 
-function predict_cov(model:: GPR, x_new)
+function predict_cov(model:: GPR, x_new:: AbstractVecOrMat)
     (x, _) = model.training_data
     K = model.kernel
     σ = model.σ
     K(x_new, x_new) - K(x_new, x) * inv(K(x, x) + I*σ^2) * K(x_new, x)'
 end
 
-function predict_std(model:: GPModel, x_new)
+function predict_std(model:: GPModel, x_new:: AbstractVecOrMat)
     sqrt.(diag(predict_cov(model, x_new)))
 end
 
@@ -67,7 +67,8 @@ function loglik(model:: GPR)
     -0.5*y'*inv(K(x, x) + I*σ^2)*y - 0.5*log(det(K(x, x) + I*σ^2)) - 0.5*n*log(2*pi)
 end
 
-function grad_step!(model:: GPR, η=1e-3)
+# TODO: this isn't working yet
+function grad_step!(model:: GPR, η=1e-3:: AbstractFloat)
     θ = params(model)
     ∇ = gradient(() -> loglik(model), θ)
     for p in θ
