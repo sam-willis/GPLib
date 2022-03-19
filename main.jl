@@ -1,7 +1,7 @@
 include("./gplib.jl")
-using .GPLib
-
+using Revise
 using Flux
+using .GPLib
 
 #%% create a problem
 x = collect(1:10);

@@ -18,6 +18,10 @@ for op in (:+, :-, :*, :/, :^)
     @eval Base.$op(x::HyperParameter, y::Number) = Base.$op(promote(x.value[1][1], y)...)
     @eval Base.$op(x::Number, y::HyperParameter) = Base.$op(promote(x, y.value[1][1])...)
 end
+# Todo make iteration for for hyperparams (i.e. ops like .+)
+#for op in (:length)
+#    @eval Base.$op(x::HyperParameter) = Base.$op(x.value[1][1])
+#end
 Base.show(io::IO, x::HyperParameter) = show(io, x.value[1][1])
 
 mutable struct Data
