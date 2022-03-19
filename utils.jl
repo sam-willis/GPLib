@@ -13,17 +13,11 @@ end
 HyperParameter(value::Number) = HyperParameter([float(value)])
 Base.convert(::Type{HyperParameter}, value::Number) = HyperParameter([float(value)])
 Flux.@functor HyperParameter
-# TODO: replace this with a macro or something metaprogrammy
-Base.:+(x::HyperParameter, y::Number) = Base.:+(promote(x.value[1][1], y)...)
-Base.:+(x::Number, y::HyperParameter) = Base.:+(promote(x, y.value[1][1])...)
-Base.:-(x::HyperParameter, y::Number) = Base.:-(promote(x.value[1][1], y)...)
-Base.:-(x::Number, y::HyperParameter) = Base.:-(promote(x, y.value[1][1])...)
-Base.:*(x::HyperParameter, y::Number) = Base.:*(promote(x.value[1][1], y)...)
-Base.:*(x::Number, y::HyperParameter) = Base.:*(promote(x, y.value[1][1])...)
-Base.:/(x::HyperParameter, y::Number) = Base.:/(promote(x.value[1][1], y)...)
-Base.:/(x::Number, y::HyperParameter) = Base.:/(promote(x, y.value[1][1])...)
-Base.:^(x::HyperParameter, y::Number) = Base.:^(promote(x.value[1][1], y)...)
-Base.:^(x::Number, y::HyperParameter) = Base.:^(promote(x, y.value[1][1])...)
+
+for op in (:+, :-, :*, :/, :^)
+    @eval Base.$op(x::HyperParameter, y::Number) = Base.$op(promote(x.value[1][1], y)...)
+    @eval Base.$op(x::Number, y::HyperParameter) = Base.$op(promote(x, y.value[1][1])...)
+end
 Base.show(io::IO, x::HyperParameter) = show(io, x.value[1][1])
 
 mutable struct Data
