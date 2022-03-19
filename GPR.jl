@@ -3,6 +3,7 @@ using Plots
 using Flux
 using Flux.Optimise: update!
 import Base
+import RecipesBase.plot
 
 abstract type Kernel end
 abstract type GPModel end
@@ -86,6 +87,38 @@ function grad_step!(model:: GPR, η=1e-3:: AbstractFloat)
     end
 end
 
+# plotting functions
+
+function plot(x:: AbstractVecOrMat, model:: GPR)
+    mean = predict_mean(model, x)
+    plot(
+        x, 
+        mean, 
+        label="mean"
+    )
+    std = predict_std(model, x)
+    plot!(
+        x, 
+        mean - std, 
+        fillrange=mean + std, 
+        alpha=0.2, 
+        fillalpha =0.2, 
+        c=1, 
+        label="var"
+    )
+end
+
+function plot(x:: AbstractVecOrMat, model:: GPR, training_data:: Tuple{AbstractVecOrMat, AbstractVector})
+    plot(x, model)
+    (x_train, y_train) = training_data
+    plot!(
+        x_train, 
+        y_train, 
+        seriestype=:scatter, 
+        label = "y"
+    )
+end
+
 #%% create a problem
 x = collect(1:10); 
 y = x/10 + 0.5 * rand(size(x, 1))
@@ -102,26 +135,5 @@ end
 println(params(gpr))
 
 #%% plot prediction vs training data
-mean_test = predict_mean(gpr, x_test)
-std_test = predict_std(gpr, x_test)
 
-plot(
-    x, 
-    y, 
-    seriestype=:scatter, 
-    label = "y"
-)
-plot!(
-    x_test, 
-    mean_test, 
-    label="mean"
-)
-plot!(
-    x_test, 
-    mean_test - std_test, 
-    fillrange=mean_test + std_test, 
-    alpha=0.2, 
-    fillalpha = 0.2, 
-    c = 1, 
-    label = "var"
-)
+plot(x_test, gpr, (x, y))
