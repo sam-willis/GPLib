@@ -40,8 +40,7 @@ function loglik(model::GPR)
     K = model.kernel
     σ = model.σ
     n = length(x)
-    -0.5 * y' * inv(K(x, x) + I * σ^2) * y - 0.5 * log(det(K(x, x) + I * σ^2)) -
-    0.5 * n * log(2 * pi)
+    -0.5 * y' * inv(K(x, x) + I * σ^2) * y - 0.5 * log(det(K(x, x) + I * σ^2)) - 0.5 * n * log(2 * pi)
 end
 
 function grad_step!(model::GPR, η = 1e-3::AbstractFloat)
